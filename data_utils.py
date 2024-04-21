@@ -19,7 +19,7 @@ from fastdatasets.record import load_dataset as Loader, RECORD, WriterObject, gf
 from tqdm import tqdm
 from transformers import HfArgumentParser
 from data_processer import DataStrategy, TokenIdsMaker
-from aigc_zoo.model_zoo.chatglm.llm_model import ChatGLMTokenizer,PetlArguments,ChatGLMConfig,build_masks_and_position_ids_glm
+from deep_training.zoo.model_zoo.chatglm.llm_model import ChatGLMTokenizer,PetlArguments,ChatGLMConfig,build_masks_and_position_ids_glm
 from config import *
 
 data_conf = {
@@ -27,9 +27,9 @@ data_conf = {
     DataStrategy.truncation: {
     },
     DataStrategy.sliding: {
-        'sliding_size': train_info_args['max_seq_length'] // 3 * 2, #prompt滑动窗口大小
+        'sliding_size': config_args['max_seq_length'] // 3 * 2, #prompt滑动窗口大小
         'p':-1, # p < 0 , 随机选举prompt
-        "src_max_length": train_info_args['max_seq_length'] - 10,
+        "src_max_length": config_args['max_seq_length'] - 10,
         "dst_max_length": None,
     },
 }
@@ -227,19 +227,19 @@ if __name__ == '__main__':
     if global_args[ "trainer_backend" ] == "hf":
         parser = HfArgumentParser((ModelArguments, TrainingArgumentsHF, DataArguments, PetlArguments),
                                   conflict_handler='resolve')
-        model_args, training_args, data_args, lora_args = parser.parse_dict(train_info_args,
+        model_args, training_args, data_args, lora_args = parser.parse_dict(config_args,
                                                                             allow_extra_keys=True, )
     elif global_args[ "trainer_backend" ] == "pl":
         parser = HfArgumentParser((ModelArguments, TrainingArguments, DataArguments, PetlArguments))
-        model_args, training_args, data_args, _ = parser.parse_dict(train_info_args)
+        model_args, training_args, data_args, _ = parser.parse_dict(config_args)
     elif global_args[ "trainer_backend" ] == "cl":
         parser = HfArgumentParser((ModelArguments, TrainingArgumentsCL, DataArguments, PetlArguments),
                                   conflict_handler='resolve')
-        model_args, training_args, data_args, lora_args = parser.parse_dict(train_info_args, allow_extra_keys=True, )
+        model_args, training_args, data_args, lora_args = parser.parse_dict(config_args, allow_extra_keys=True, )
     else:
         parser = HfArgumentParser((ModelArguments, TrainingArgumentsAC, DataArguments, PetlArguments),
                                   conflict_handler='resolve')
-        model_args, training_args, data_args, lora_args = parser.parse_dict(train_info_args,
+        model_args, training_args, data_args, lora_args = parser.parse_dict(config_args,
                                                                                          allow_extra_keys=True, )
 
     dataHelper = NN_DataHelper(model_args, training_args, data_args)

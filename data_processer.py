@@ -6,7 +6,7 @@ import typing
 from enum import Enum
 import numpy as np
 
-from aigc_zoo.model_zoo.chatglm.llm_model import ChatGLMTokenizer
+from deep_training.zoo.model_zoo.chatglm.llm_model import ChatGLMTokenizer
 
 
 class DataStrategy(Enum):

@@ -7,14 +7,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),'..')))
 import torch
 from deep_training.data_helper import ModelArguments
 from transformers import HfArgumentParser
-from data_utils import train_info_args, NN_DataHelper
-from aigc_zoo.model_zoo.chatglm.llm_model import MyTransformer,ChatGLMTokenizer,setup_model_profile, ChatGLMConfig
-from aigc_zoo.model_zoo.chatglm.llm_model import RotaryNtkScaledArguments,RotaryLinearScaledArguments # aigc-zoo 0.1.21
+from data_utils import config_args, NN_DataHelper
+from deep_training.zoo.model_zoo.chatglm.llm_model import MyTransformer,ChatGLMTokenizer,setup_model_profile, ChatGLMConfig
+from deep_training.zoo.model_zoo.chatglm.llm_model import RotaryNtkScaledArguments,RotaryLinearScaledArguments # aigc-zoo 0.1.21
 
 if __name__ == '__main__':
-    train_info_args['seed'] = None
+    config_args['seed'] = None
     parser = HfArgumentParser((ModelArguments,))
-    (model_args,) = parser.parse_dict(train_info_args,allow_extra_keys=True)
+    (model_args,) = parser.parse_dict(config_args,allow_extra_keys=True)
 
     setup_model_profile()
 

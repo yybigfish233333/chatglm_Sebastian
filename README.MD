@@ -2,26 +2,27 @@
 - [deep_training](https://github.com/ssbuild/deep_training)
 
 ```text
-    10-09 support accelerator trainer
-    10-07 support colossalai trainer
-    09-26 support transformers trainer
-    08-16 解除 chatglm-6b-int4 全参训练限制， 推理可选使用 Rope NtkScale , 不训练扩展推理长度
-    08-02 增加 muti lora infer 例子, 手动升级 aigc_zoo , pip install -U git+https://github.com/ssbuild/aigc_zoo.git --force-reinstall --no-deps 
-    07-18 微调经验分享见: https://github.com/ssbuild/aigc_zoo#训练经验分享
-    06-26 chatglm2_finetuning 移至(https://github.com/ssbuild/chatglm2_finetuning)
-    06-13 support resize_token_embeddings
-    06-01 支持lora deepspeed 训练，0.1.9 和 0.1.10合并
-    05-27 add qlora transformers>=4.30
-    05-12 fix lora int8 多卡训练 , ppo training move to https://github.com/ssbuild/rlhf_chatglm
-    04-28 deep_training 0.1.3 pytorch-lightning 改名 ligntning ，旧版本 deep_training <= 0.1.2
-    04-23 增加lora 保存hf权重（修改infer_lora_finetuning.py enable_merge_weight 选项），超大数据集见训练节说明
-    04-12 deep_training 0.1.2.post0 fix load_in_8bit in lora
-    04-11 升级 lora 以及 adalora, 另外官方fix eos_token , 请更新tokenizer_config.json
-    04-10 增加一直冻结前N层微调方式，根据需要修改models.py 变量 global_num_layers_freeze
-    04-07 官方精简了词表和权重，配置已同步，建议重新下载权重信息 deep_training 最低要求 0.1.1
-    04-02 增加p-tuning-v2训练, 建议训练前删除缓存数据 rm -rf output
-    03-27 fix eos and support chatglm-6b-int4权重 (修改 对应配置文件quantization_bit 4 or 8)
-    03-26 完善数据策略
+    2024-04-22 简化
+    2023-10-09 support accelerator trainer
+    2023-10-07 support colossalai trainer
+    2023-09-26 support transformers trainer
+    2023-08-16 解除 chatglm-6b-int4 全参训练限制， 推理可选使用 Rope NtkScale , 不训练扩展推理长度
+    2023-08-02 增加 muti lora infer 例子, 手动升级 aigc_zoo , pip install -U git+https://github.com/ssbuild/deep_training.zoo.git --force-reinstall --no-deps 
+    2023-07-18 微调经验分享见: https://github.com/ssbuild/aigc_zoo#训练经验分享
+    2023-06-26 chatglm2_finetuning 移至(https://github.com/ssbuild/chatglm2_finetuning)
+    2023-06-13 support resize_token_embeddings
+    2023-06-01 支持lora deepspeed 训练，0.1.9 和 0.1.10合并
+    2023-05-27 add qlora transformers>=4.30
+    2023-05-12 fix lora int8 多卡训练 , ppo training move to https://github.com/ssbuild/rlhf_chatglm
+    2023-04-28 deep_training 0.1.3 pytorch-lightning 改名 ligntning ，旧版本 deep_training <= 0.1.2
+    2023-04-23 增加lora 保存hf权重（修改infer_lora_finetuning.py enable_merge_weight 选项），超大数据集见训练节说明
+    2023-04-12 deep_training 0.1.2.post0 fix load_in_8bit in lora
+    2023-04-11 升级 lora 以及 adalora, 另外官方fix eos_token , 请更新tokenizer_config.json
+    2023-04-10 增加一直冻结前N层微调方式，根据需要修改models.py 变量 global_num_layers_freeze
+    2023-04-07 官方精简了词表和权重，配置已同步，建议重新下载权重信息 deep_training 最低要求 0.1.1
+    2023-04-02 增加p-tuning-v2训练, 建议训练前删除缓存数据 rm -rf output
+    2023-03-27 fix eos and support chatglm-6b-int4权重 (修改 对应配置文件quantization_bit 4 or 8)
+    2023-03-26 完善数据策略
 ```
    
 
