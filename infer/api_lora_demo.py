@@ -9,11 +9,11 @@ import uvicorn, json, datetime
 import torch
 
 from deep_training.data_helper import ModelArguments, DataArguments
-from deep_training.nlp.models.chatglm import setup_model_profile, ChatGLMConfig
+from deep_training.nlp.models.chatglm2.modeling_chatglm import setup_model_profile, ChatGLMConfig
 from transformers import HfArgumentParser
 
 from data_utils import config_args, NN_DataHelper,global_args
-from deep_training.zoo.model_zoo.chatglm.llm_model import MyTransformer, ChatGLMTokenizer,PetlArguments
+from deep_training.zoo.model_zoo.chatglm2.llm_model import MyTransformer, ChatGLMTokenizer,PetlArguments
 
 DEVICE = "cuda"
 DEVICE_ID = "0"
@@ -63,30 +63,31 @@ async def create_item(request: Request):
 
 if __name__ == '__main__':
     config_args['seed'] = None
-    parser = HfArgumentParser((ModelArguments,))
-    (model_args,) = parser.parse_dict(config_args, allow_extra_keys=True)
+    parser = HfArgumentParser((ModelArguments, DataArguments))
+    model_args, data_args = parser.parse_dict(config_args,allow_extra_keys=True)
 
     setup_model_profile()
 
-    dataHelper = NN_DataHelper(model_args)
+    dataHelper = NN_DataHelper(model_args, None, data_args)
     tokenizer: ChatGLMTokenizer
     tokenizer, _, _, _ = dataHelper.load_tokenizer_and_config(
         tokenizer_class_name=ChatGLMTokenizer, config_class_name=ChatGLMConfig)
 
     ckpt_dir = './best_ckpt/last'
     config = ChatGLMConfig.from_pretrained(ckpt_dir)
-    config.initializer_weight = False
+    
 
     lora_args = PetlArguments.from_pretrained(ckpt_dir)
 
     assert lora_args.inference_mode == True and config.pre_seq_len is None
 
-    new_num_tokens = config.vocab_size
-    if config.task_specific_params is not None and config.task_specific_params.get('vocab_size', None) is not None:
-        config.vocab_size = config.task_specific_params['vocab_size']
+    # new_num_tokens = config.vocab_size
+    # if config.task_specific_params is not None and config.task_specific_params.get('vocab_size', None) is not None:
+    #     config.vocab_size = config.task_specific_params['vocab_size']
 
     pl_model = MyTransformer(config=config, model_args=model_args, lora_args=lora_args,
-                             torch_dtype=torch.float16,new_num_tokens=new_num_tokens,
+                             torch_dtype=torch.float16,
+                             # new_num_tokens=new_num_tokens, # 扩充词
                              # load_in_8bit=global_args["load_in_8bit"],
                              # # device_map="auto",
                              # device_map={"": 0},  # 第一块卡

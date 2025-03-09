@@ -12,8 +12,9 @@ from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from transformers import HfArgumentParser
 from data_utils import NN_DataHelper, config_args, get_deepspeed_config,global_args
-from deep_training.zoo.model_zoo.chatglm.llm_model import MyTransformer, ChatGLMTokenizer,PetlArguments,ChatGLMConfig, setup_model_profile
+from deep_training.zoo.model_zoo.chatglm2.llm_model import MyTransformer, ChatGLMTokenizer,PetlArguments,ChatGLMConfig, setup_model_profile
 
+assert global_args["trainer_backend"] == "pl"
             
 def main():
     parser = HfArgumentParser((ModelArguments, TrainingArguments, DataArguments, PetlArguments))
@@ -26,16 +27,16 @@ def main():
 
     dataHelper = NN_DataHelper(model_args, training_args, data_args)
     config_kwargs = {}
-    if global_args[ "config_merge" ]:
-        config_kwargs.update(global_args[ "config_merge" ])
+    if global_args["config_merge"]:
+        config_kwargs.update(global_args["config_merge"])
     tokenizer, config, _, _ = dataHelper.load_tokenizer_and_config(tokenizer_class_name=ChatGLMTokenizer,
                                                                    config_class_name=ChatGLMConfig,
                                                                    config_kwargs=config_kwargs)
-    assert tokenizer.eos_token_id == 130005
+
 
 
     if config.quantization_bit != 0 and lora_args is not None:
-        raise AssertionError("quantization lora not support")
+        raise AssertionError("quantization ptv2 not support")
 
     if config.pre_seq_len is not None and lora_args is not None:
         raise ValueError('with lora and ptuning v2 cannot open at the same time')
@@ -62,7 +63,6 @@ def main():
         strategy = DeepSpeedStrategy(config=deepspeed_config, )
 
 
-
     checkpoint_callback = ModelCheckpointEx(
         # monitor='loss',
         dirpath=output_weight_dir,
@@ -71,7 +71,7 @@ def main():
         # every_n_train_steps=2000 // training_args.gradient_accumulation_steps,
         every_n_epochs=1,
         lora_args=lora_args,
-        # monitor="loss",mode = "min", save_top_k = 10 按loss存储10个模型
+        # monitor="loss"，mode = "min", save_top_k = 10 按loss存储10个模型
         monitor="step", mode="max",
         save_top_k=10,  # 按步存储最后10个模型
     )
@@ -90,17 +90,19 @@ def main():
         accumulate_grad_batches=training_args.gradient_accumulation_steps,
         num_sanity_val_steps=0,
         strategy=strategy,
+        #lora int8 precision='32'
         precision= precision , #  #可以自行尝试  "32": "32-true", "16": "16-mixed", "bf16": "bf16-mixed"
     )
 
-    transformer_args = dict(config=config,
-                            model_args=model_args, training_args=training_args, lora_args=lora_args,
-                            num_layers_freeze=global_args["num_layers_freeze"],#
-                            quantization_config=global_args["quantization_config"],
-                            device_map={"": trainer.local_rank} if trainer.world_size > 1 else "auto",
-                            torch_dtype=torch.float16,
-                            new_num_tokens=len(tokenizer),  # 可能扩充词 , 还有一些隐藏token, 如果不需要可自行注释)
-                            )
+    transformer_args = dict(
+        config=config, model_args=model_args, training_args=training_args, lora_args=lora_args,
+        num_layers_freeze=global_args["num_layers_freeze"],  #
+        quantization_config=global_args["quantization_config"],
+        device_map={"": trainer.local_rank} if trainer.world_size > 1 else "auto",
+        torch_dtype=torch.float16,
+        # new_num_tokens=len(tokenizer),  # 可能扩充词 , 还有一些隐藏token, 如果不需要可自行注释
+    )
+
     # ptv2 移除device_map
     if config.pre_seq_len or global_args["quantization_config"] is None:
         transformer_args.pop("device_map")
@@ -130,18 +132,21 @@ def main():
 
 
     train_datasets = dataHelper.load_distributed_random_sampler(
+
         dataHelper.load_dataset_files()["train_files"],
         with_load_memory=data_args.data_backend == 'record',
         collate_fn=dataHelper.collate_fn,
         batch_size=training_args.train_batch_size,
-        drop_last=True,  # 多卡建议扔掉
+        drop_last=training_args.dataloader_drop_last,  # 多卡建议扔掉
         num_processes=trainer.world_size, process_index=trainer.global_rank,
         dataset_loader_filter_fn=dataset_loader_filter_fn,
-        num_workers=0
+        num_workers=training_args.dataloader_num_workers,
+        pin_memory=training_args.dataloader_pin_memory,
     )
 
     if train_datasets is not None:
         trainer.fit(pl_model, train_dataloaders=train_datasets)
+
 
 def _mp_fn(index):
     # For xla_spawn (TPUs)

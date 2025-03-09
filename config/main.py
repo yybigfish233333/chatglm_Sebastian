@@ -4,13 +4,16 @@
 import json
 import os
 import torch
-from deep_training.utils.wrapper import load_yaml
+import yaml
 from transformers import BitsAndBytesConfig
 from transformers.utils import strtobool
+
 from deep_training.zoo.constants.define import (TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING,
                                        TRANSFORMERS_MODELS_TO_ADALORA_TARGET_MODULES_MAPPING,
                                        TRANSFORMERS_MODELS_TO_IA3_TARGET_MODULES_MAPPING,
                                        TRANSFORMERS_MODELS_TO_IA3_FEEDFORWARD_MODULES_MAPPING)
+
+
 
 
 # 按需修改
@@ -20,14 +23,21 @@ from deep_training.zoo.constants.define import (TRANSFORMERS_MODELS_TO_LORA_TARG
 # TRANSFORMERS_MODELS_TO_IA3_FEEDFORWARD_MODULES_MAPPING
 
 
+
+from deep_training.utils.wrapper import load_yaml
+
+
+
 # 加载
 __CUR_PATH__ = os.path.abspath(os.path.dirname(__file__))
+
 
 config_args = load_yaml(os.environ.get('train_file', os.path.join(__CUR_PATH__, 'train_pl.yaml')))
 global_args = config_args.pop("global_args")
 global_models_mapper = config_args.pop("global_models_mapper")
 colossalai_strategy = config_args.pop("colossalai_strategy", {})
 train_model_config = global_models_mapper[global_args["model_name"]]
+
 
 
 
@@ -47,6 +57,9 @@ def merge_from_env(global_args):
         global_args.update(merge_config)
 
 merge_from_env(global_args)
+
+
+
 
 def patch_args(config_args):
     assert global_args[ "trainer_backend" ] in [ "pl", "hf", "cl", "ac" ]
