@@ -16,7 +16,7 @@ from fastdatasets.record import load_dataset as Loader, RECORD, WriterObject, gf
 from tqdm import tqdm
 from transformers import HfArgumentParser
 from data_processer import DataStrategy, TokenIdsMaker
-from deep_training.zoo.model_zoo.chatglm2.llm_model import ChatGLMTokenizer,PetlArguments,ChatGLMConfig,build_masks_and_position_ids_glm
+from deep_training.zoo.model_zoo.chatglm3.llm_model import ChatGLMTokenizer,PetlArguments,ChatGLMConfig
 from config import *
 
 assert config_args['max_seq_length'] > 20
@@ -44,10 +44,23 @@ def postprocess(text):
   # return text.replace("\\n", "\n").replace("\\t", "\t")
   return text
 
+def build_masks_and_position_ids_glm(batch_input_ids, ctxlens):
+    max_len = batch_input_ids.size(1)
+    batch_position_ids, batch_attention_mask = [], []
+    for input_ids,ctxlen in zip(batch_input_ids,ctxlens):
+        position_ids = list(range(0,max_len))
+        assert ctxlen <= max_len
+        attention_mask = [1] * ctxlen + [0] * (max_len - ctxlen)
+        batch_position_ids.append(torch.tensor(position_ids,dtype=torch.long))
+        batch_attention_mask.append(torch.tensor(attention_mask,dtype=torch.long))
 
+    batch_attention_mask = torch.stack(batch_attention_mask, dim=0)
+    batch_position_ids = torch.stack(batch_position_ids, dim=0)
+    return batch_attention_mask,batch_position_ids
 
 class NN_DataHelper(DataHelper):
     index = 1
+    tokens_ids_maker = None
     def on_data_ready(self):
         self.index = -1
 
@@ -56,26 +69,21 @@ class NN_DataHelper(DataHelper):
         self.index += 1
 
 
-        tokenizer: ChatGLMTokenizer
-        config: ChatGLMConfig
+        tokenizer: ChatGLMTokenizer = self.tokenizer # noqa
+        config: ChatGLMConfig = self.config           # noqa
         max_seq_length = self.max_seq_length_dict[mode]
-        tokenizer = self.tokenizer
-        config = self.config
 
-        if not hasattr(self, 'sptoken'):
-            self.sptoken = tokenizer.encode(text="")[-2:]
-
+        if self.tokens_ids_maker is None:
+            self.tokens_ids_maker = TokenIdsMaker(tokenizer=tokenizer,config=config)
 
 
         examples = data
 
         strategy = data_conf['strategy']
         if strategy == DataStrategy.truncation:
-            ds = TokenIdsMaker.trunction(tokenizer,config,examples=examples, max_seq_length=max_seq_length,
-                                         sptoken=self.sptoken ,**data_conf[strategy])
+            ds = self.tokens_ids_maker.trunction(tokenizer,config,examples=examples, max_seq_length=max_seq_length,**data_conf[strategy])
         elif strategy == DataStrategy.siding:
-            ds = TokenIdsMaker.slidding(tokenizer,config, examples=examples, max_seq_length=max_seq_length,
-                                        sptoken=self.sptoken, **data_conf[strategy])
+            ds = self.tokens_ids_maker.slidding(tokenizer,config, examples=examples, max_seq_length=max_seq_length, **data_conf[strategy])
         else:
             raise ValueError('Invalid strategy',strategy)
 
@@ -87,26 +95,27 @@ class NN_DataHelper(DataHelper):
         return ds
 
     def _get_paragraph(self, lines):
-        D = []
+        D = [ ]
         for line_id, line in enumerate(lines):
             jd = json.loads(line)
             if not jd:
                 continue
-            paragraph = jd['paragraph']
+            paragraph = jd[ 'paragraph' ]
             if line_id < 10:
                 print(paragraph)
 
-            paragraph = [(session.get("role", ""), preprocess(session['q']),
-                          preprocess('\n'.join(session['a'])) if isinstance(session['a'], list) else preprocess(
-                              session['a']))
-                         for session in paragraph]
-            sub = []
+
+            paragraph = [ (session.get("role",""),preprocess(session[ 'q' ]),
+                           preprocess('\n'.join(session[ 'a' ])) if isinstance(session[ 'a' ], list) else preprocess(
+                               session[ 'a' ]))
+                          for session in paragraph ]
+            sub = [ ]
             # 自行做模板
             for (role, q, a) in paragraph:
                 # 不是system prompt  answer 必须存在
                 if role != "system":
                     assert len(a), ValueError('answer cannot empty')
-                sub.append((role, q, a))
+                sub.append((role,q, a))
             D.append(copy.deepcopy(sub))
             sub.clear()
         return D
@@ -121,6 +130,7 @@ class NN_DataHelper(DataHelper):
             if line_id < 10:
                 print(conversations)
 
+
             cid = 0
             sub = []
             while cid < len(conversations):
@@ -130,9 +140,9 @@ class NN_DataHelper(DataHelper):
                 q = preprocess(m["value"])
                 if role == "system":
                     a = ""
-                    sub.append((role, q, a))
+                    sub.append((role,q,a))
                     continue
-                assert role in ['user', 'observation', 'function']
+                assert role in ['user','observation','function']
                 m = conversations[cid]
                 cid += 1
                 assert m["from"] == "assistant"
@@ -141,8 +151,7 @@ class NN_DataHelper(DataHelper):
                 sub.append((role, q, a))
             D.append(sub)
         return D
-        # 读取文件
-
+    # 读取文件
     def on_get_corpus(self, files: typing.List, mode: str):
         D = []
         files = sum([glob.glob(file) for file in files], [])
@@ -159,9 +168,6 @@ class NN_DataHelper(DataHelper):
         return D
 
     def collate_fn(self,batch):
-        if not hasattr(self,'sptoken'):
-            self.sptoken = self.tokenizer.encode(text="")[-2:]
-
         o = {}
         for i, b in enumerate(batch):
             if i == 0:
@@ -179,7 +185,7 @@ class NN_DataHelper(DataHelper):
 
         attention_mask,position_ids = build_masks_and_position_ids_glm(input_ids,seqlens)
         o['input_ids'] = input_ids.long()
-        o['attention_mask'] = attention_mask.bool()
+        o['attention_mask'] = attention_mask.long()
         o['position_ids'] = position_ids.long()
         o['labels'] = o['labels'][:, :max_len].long()
         return o
@@ -210,7 +216,6 @@ class NN_DataHelper(DataHelper):
                 "eval_files": self.eval_files,
                 "test_files": self.test_files,
             }, ensure_ascii=False))
-
     @cache
     def load_dataset_files(self):
         data_args = self.data_args
@@ -224,7 +229,6 @@ class NN_DataHelper(DataHelper):
         assert os.path.exists(filename), 'make you dataset firstly'
         with open(filename, mode='r', encoding='utf-8') as f:
             return json.loads(f.read())
-
 
 if __name__ == '__main__':
     if global_args[ "trainer_backend" ] == "hf":
@@ -247,6 +251,7 @@ if __name__ == '__main__':
     dataHelper = NN_DataHelper(model_args, training_args, data_args)
     tokenizer, config, _,_ = dataHelper.load_tokenizer_and_config(tokenizer_class_name=ChatGLMTokenizer,
                                                                   config_class_name=ChatGLMConfig)
+    
 
     # 缓存数据集
     print(f'to make dataset is overwrite_cache {data_args.overwrite_cache}')

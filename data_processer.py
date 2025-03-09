@@ -1,76 +1,32 @@
 # @Time    : 2023/3/25 18:36
 # @Author  : tk
 import copy
+import json
 import random
 import typing
 from enum import Enum
 import numpy as np
-from deep_training.zoo.model_zoo.chatglm2.llm_model import ChatGLMTokenizer
+from deep_training.zoo.model_zoo.chatglm3.llm_model import ChatGLMTokenizer
 
 class DataStrategy(Enum):
     truncation = 1
     siding = 2
 
-
-
-
-
-
-def build_template_chatglm(query, answer = None , prefix=None, history=None):
-    prompt = prefix or ''
-    sid = 0
-    if history is not None:
-        for q, a in history:
-            prompt += "[Round {}]\n问：{}\n答：{}".format(sid,q, a)
-            sid += 1
-    prompt += query if sid == 0 else "[Round {}]\n问：{}\n答：".format(sid, query)
-    if answer is not None:
-        prompt += answer
-    return prompt
-
-def build_template_chatglm2(query, answer = None,prefix=None,  history=None):
-    prompt = prefix or ''
-    sid = 1
-    if history is not None:
-        for q, a in history:
-            prompt += "[Round {}]\n问：{}\n答：{}".format(sid,q, a)
-            sid += 1
-    prompt += "[Round {}]\n问：{}\n答：".format(sid, query)
-    if answer is not None:
-        prompt += answer
-    return prompt
-
-
-def build_template_default(query, answer = None, prefix=None, history=None):
-    prompt = prefix or ''
-    if history is not None:
-        for q,a in history:
-            prompt += "User: {}\nAssistant:{}".format(q,a)
-    prompt += "User: {}\nAssistant:".format(query)
-    if answer is not None:
-        prompt += answer
-    return prompt
-
-def build_template_tiger(query,answer = None, prefix=None, history=None):
-    prompt = prefix or ''
-    tok_ins = "\n\n### Instruction:\n"
-    tok_res = "\n\n### Response:\n"
-    if history is not None:
-        for q,a in history:
-            prompt += "{}{}{}{}".format(tok_ins,q,tok_res,a)
-
-    prompt += "{}{}{}".format(tok_ins, query, tok_res)
-    if answer is not None:
-        prompt += answer
-    return prompt
-
-
-# 切换模版
-build_template = build_template_chatglm2
-
-
-#对截断
 class TokenIdsMaker:
+    def __init__(self,tokenizer: ChatGLMTokenizer, config):
+        self.tokenizer = tokenizer
+        self.config = config
+        self.bos_token_id = self.tokenizer.get_command("<bos>")
+        self.pad_token_id = self.tokenizer.get_command("<pad>")
+        self.eos_token_id = self.tokenizer.get_command("<eos>")
+
+    def build_single_message(self, role, metadata, message):
+        assert role in ["system", "user", "assistant", "observation"], role
+        role_tokens = [self.tokenizer.get_command(f"<|{role}|>")] + self.tokenizer.encode(f"{metadata}\n")
+        message_tokens = self.tokenizer.encode(message)
+        tokens = role_tokens + message_tokens
+        return tokens
+
     @classmethod
     def final(cls, input_ids: typing.List, labels, max_seq_length, tokenizer):
         input_ids = np.asarray(input_ids, dtype=np.int32)
@@ -89,75 +45,120 @@ class TokenIdsMaker:
             'seqlen': seqlen,
         }
         return d
-    @classmethod
-    def trunction(cls, tokenizer: ChatGLMTokenizer,config, examples, max_seq_length, sptoken: typing.List,sup=True):
+
+
+    def build_chat_input(self, query, history=None, role="user"):
+        if history is None:
+            history = []
+        input_ids = []
+        for item in history:
+            content = item["content"]
+            input_ids.extend(self.build_single_message(item["role"], item.get("metadata", ""), content))
+        if query is not None:
+            input_ids.extend(self.build_single_message(role, "", query))
+        return self.tokenizer.encode(input_ids,  is_split_into_words=True)
+
+    def parse_history_from_answers(self, output, history):
+        content = ""
+        metadata = ""
+        history = copy.deepcopy(history)
+
+        responses = output.split("<|assistant|>")
+        for response in responses:
+            #ensure 语料包含换行符 格式为{metadata}\n{content}
+            if len(responses) > 1:
+                metadata, content = response.split("\n", maxsplit=1)
+            else:
+                metadata = ""
+                content = response
+
+            if not metadata.strip():
+                content = content.strip()
+                history.append({"role": "assistant", "metadata": metadata, "content": content})
+            else:
+                history.append({"role": "assistant", "metadata": metadata, "content": content})
+        return metadata, content, history
+
+    def trunction(self, tokenizer: ChatGLMTokenizer,config, examples, max_seq_length,sup=True):
         ds = []
-        prefix = None
         history = []
-        for sid, (q_role, q, a) in enumerate(examples):
+        for sid, (q_role,q,a) in enumerate(examples):
             if q_role == "system":
-                prefix = q
+                prefix = {
+                    "role": "system",
+                    "content": q,
+                }
+                history += [prefix]
                 continue
-            history += [(q, a)]
-            a_ids = tokenizer.encode(text=build_template(q,prefix=prefix, history=history[:-1]), add_special_tokens=False)
-            b_ids = tokenizer.encode(text=a, add_special_tokens=False)
-            while len(a_ids) + len(b_ids) > max_seq_length - len(sptoken) - 1:
+            if q_role == "function":
+                q_role = "observation"
+
+            if q_role != "observation":
+                q_role = "user"
+            history += [ {
+                "role": q_role,
+                "content": q,
+            } ]
+            a_ids = self.build_chat_input(query=None, history=history)
+            metadata, content, history = self.parse_history_from_answers(a,history)
+            b_ids = self.tokenizer.encode(self.tokenizer.encode(a),is_split_into_words=True)
+            role_tokens = [ self.tokenizer.get_command("<|assistant|>") ] + self.tokenizer.encode(f"{metadata}\n")
+            while len(a_ids) + len(b_ids) > max_seq_length - len(role_tokens) - 2:
                 if len(b_ids) > len(a_ids):
                     b_ids.pop(-1)
                 else:
                     a_ids.pop(0)
-            b_ids += [config.eos_token_id]
+            assert len(b_ids) > 0
+            b_ids += [ self.eos_token_id ]
+            a_ids = a_ids + role_tokens
             input_ids = a_ids + b_ids
-            labels = copy.deepcopy(input_ids) if not sup else [-100] * len(a_ids) + copy.deepcopy(b_ids)
-            input_ids = sptoken + input_ids
-            labels = sptoken + labels if not sup else [-100] * len(sptoken) + labels
+            labels = copy.deepcopy(input_ids) if not sup else [ -100 ] * len(a_ids) + copy.deepcopy(b_ids)
+            input_ids = [self.bos_token_id] + input_ids
+            labels = [self.bos_token_id] + labels if not sup else [ -100 ]  + labels
             assert len(input_ids) <= max_seq_length
-            ds.append(cls.final(input_ids, labels, max_seq_length, tokenizer))
+            ds.append(self.final(input_ids, labels, max_seq_length, tokenizer))
+
         return ds
 
 
-    @classmethod
-    def slidding(cls, tokenizer: ChatGLMTokenizer,config, examples,
-                 max_seq_length,
-                 sptoken: typing.List,
-                 sliding_size = None,
-                 src_max_length=-1,
-                 dst_max_length=-1,
-                 sup=True):
-        if sliding_size is None or sliding_size < 0:
-            sliding_size = max_seq_length - len(sptoken)
 
-        assert sliding_size <= max_seq_length - len(sptoken)
-
-        ds = []
-        prefix = None
-        history = []
-        for sid, (q_role, q, a) in enumerate(examples):
-            if q_role == "system":
-                prefix = q
-                continue
-            history += [(q, a)]
-            a_ids = tokenizer.encode(text=build_template(q,prefix=prefix, history=history[:-1]), add_special_tokens=False)
-            b_ids = tokenizer.encode(text=a, add_special_tokens=False)
-            if src_max_length and src_max_length > 0:
-                a_ids = a_ids[:src_max_length]
-            if dst_max_length and dst_max_length > 0:
-                b_ids = b_ids[:dst_max_length]
-
-            b_ids += [config.eos_token_id]
-            input_ids_qa = a_ids + b_ids
-            labels_all = copy.deepcopy(input_ids_qa) if not sup else [-100] * len(a_ids) + b_ids
-
-            pos = 0
-            while pos < len(input_ids_qa):
-                input_ids = input_ids_qa[pos:pos + max_seq_length - len(sptoken)]
-                labels = labels_all[pos:pos + max_seq_length - len(sptoken)]
-
-                pos += sliding_size
-                if np.all(np.asarray(labels) == -100):
-                    continue
-
-                input_ids = sptoken + input_ids
-                labels = sptoken + labels if not sup else [-100] * len(sptoken) + labels
-                ds.append(cls.final(input_ids,labels,max_seq_length,tokenizer))
-        return ds
+    # def slidding(cls, tokenizer: ChatGLMTokenizer,config, messages,
+    #              max_seq_length,
+    #              sliding_size = None,
+    #              src_max_length=-1,
+    #              dst_max_length=-1,
+    #              sup=True):
+    #
+    #
+    #     if sliding_size is None or sliding_size < 0:
+    #         sliding_size = max_seq_length - 1
+    #
+    #     assert sliding_size <= max_seq_length - 1
+    #
+    #     ds = []
+    #
+    #     for sid, (q, a) in enumerate(messages):
+    #         a_ids = tokenizer.encode(text=build_template(q,prefix=prefix, history=examples[:sid]), add_special_tokens=False)
+    #         b_ids = tokenizer.encode(text=a, add_special_tokens=False)
+    #         if src_max_length and src_max_length > 0:
+    #             a_ids = a_ids[:src_max_length]
+    #         if dst_max_length and dst_max_length > 0:
+    #             b_ids = b_ids[:dst_max_length]
+    #
+    #         b_ids += [config.eos_token_id]
+    #         input_ids_qa = a_ids + b_ids
+    #         labels_all = copy.deepcopy(input_ids_qa) if not sup else [-100] * len(a_ids) + b_ids
+    #
+    #         pos = 0
+    #         while pos < len(input_ids_qa):
+    #             input_ids = input_ids_qa[pos:pos + max_seq_length - len(sptoken)]
+    #             labels = labels_all[pos:pos + max_seq_length - len(sptoken)]
+    #
+    #             pos += sliding_size
+    #             if np.all(np.asarray(labels) == -100):
+    #                 continue
+    #
+    #             input_ids = sptoken + input_ids
+    #             labels = sptoken + labels if not sup else [-100] * len(sptoken) + labels
+    #             ds.append(cls.final(input_ids,labels,max_seq_length,tokenizer))
+    #     return ds

@@ -12,7 +12,7 @@ from lightning.pytorch.callbacks import LearningRateMonitor
 from lightning.pytorch.strategies import DeepSpeedStrategy
 from transformers import HfArgumentParser
 from data_utils import NN_DataHelper, config_args, get_deepspeed_config,global_args
-from deep_training.zoo.model_zoo.chatglm2.llm_model import MyTransformer, ChatGLMTokenizer,PetlArguments,ChatGLMConfig, setup_model_profile
+from deep_training.zoo.model_zoo.chatglm3.llm_model import MyTransformer, ChatGLMTokenizer,PetlArguments,ChatGLMConfig, setup_model_profile
 
 assert global_args["trainer_backend"] == "pl"
             

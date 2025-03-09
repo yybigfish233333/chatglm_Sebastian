@@ -8,7 +8,7 @@ import torch
 from deep_training.data_helper import ModelArguments
 from transformers import HfArgumentParser
 from data_utils import config_args, NN_DataHelper, get_deepspeed_config
-from deep_training.zoo.model_zoo.chatglm2.llm_model import MyTransformer,ChatGLMTokenizer,setup_model_profile, ChatGLMConfig,PetlArguments
+from deep_training.zoo.model_zoo.chatglm3.llm_model import MyTransformer,ChatGLMTokenizer,setup_model_profile, ChatGLMConfig,PetlArguments
 
 deep_config = get_deepspeed_config()
 
@@ -40,12 +40,12 @@ if __name__ == '__main__':
                              # new_num_tokens=new_num_tokens,#扩充词
                              )
     if deep_config is None:
-        train_weight = './scripts/best_ckpt/last-v3.ckpt'
+        train_weight = '../scripts/best_ckpt/last-v3.ckpt'
     else:
-        #使用转换脚本命令 生成 ./best_ckpt/last/best.pt 权重文件
+        #使用转换脚本命令 生成 ../scripts/best_ckpt/last/best.pt 权重文件
         # cd best_ckpt/last
         # python zero_to_fp32.py . best.pt
-        train_weight = './scripts/best_ckpt/last/best.pt'
+        train_weight = '../scripts/best_ckpt/last/best.pt'
 
     #加载微调权重
     pl_model.load_sft_weight(train_weight,strict=True)
@@ -76,8 +76,7 @@ if __name__ == '__main__':
     ]
     for input in text_list:
         response, history = model.chat(tokenizer, input, history=[],max_length=2048,
-                                            eos_token_id=config.eos_token_id,
-                                            do_sample=True, top_p=0.7, temperature=0.95,)
+                                            do_sample=True, top_p=0.8, temperature=0.8,)
         print("input",input)
         print("response", response)
 

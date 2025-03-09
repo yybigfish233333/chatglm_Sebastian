@@ -8,8 +8,8 @@ import torch
 from deep_training.data_helper import ModelArguments
 from transformers import HfArgumentParser
 from data_utils import config_args, NN_DataHelper
-from deep_training.zoo.model_zoo.chatglm2.llm_model import MyTransformer,ChatGLMTokenizer,PetlArguments,setup_model_profile, ChatGLMConfig
-from deep_training.zoo.model_zoo.chatglm2.llm_model import RotaryNtkScaledArguments,RotaryLinearScaledArguments # aigc-zoo 0.1.20
+from deep_training.zoo.model_zoo.chatglm3.llm_model import MyTransformer,ChatGLMTokenizer,PetlArguments,setup_model_profile, ChatGLMConfig
+from deep_training.zoo.model_zoo.chatglm3.llm_model import RotaryNtkScaledArguments,RotaryLinearScaledArguments # aigc-zoo 0.1.20
 
 
 if __name__ == '__main__':
@@ -51,8 +51,7 @@ if __name__ == '__main__':
     ]
     for input in text_list:
         response, history = model.chat(tokenizer, input, history=[], max_length=2048,
-                                       eos_token_id=config.eos_token_id,
-                                       do_sample=True, top_p=0.7, temperature=0.95, )
+                                       do_sample=True, top_p=0.8, temperature=0.8, )
         print("input", input)
         print("response", response)
 

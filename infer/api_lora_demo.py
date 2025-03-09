@@ -13,7 +13,7 @@ from deep_training.nlp.models.chatglm2.modeling_chatglm import setup_model_profi
 from transformers import HfArgumentParser
 
 from data_utils import config_args, NN_DataHelper,global_args
-from deep_training.zoo.model_zoo.chatglm2.llm_model import MyTransformer, ChatGLMTokenizer,PetlArguments
+from deep_training.zoo.model_zoo.chatglm3.llm_model import MyTransformer, ChatGLMTokenizer,PetlArguments
 
 DEVICE = "cuda"
 DEVICE_ID = "0"
