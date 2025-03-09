@@ -21,7 +21,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
 from data_utils import NN_DataHelper, config_args, get_deepspeed_config, global_args
-from deep_training.zoo.model_zoo.chatglm3.llm_model import MyTransformer, ChatGLMTokenizer,PetlArguments,ChatGLMConfig, setup_model_profile
+from deep_training.zoo.model_zoo.glm4.llm_model import MyTransformer, ChatGLM4Tokenizer,PetlArguments,ChatGLMConfig, setup_model_profile
 from deep_training.data_helper import ModelArguments, DataArguments,TrainingArgumentsCL
 
 assert global_args["trainer_backend"] == "cl"
@@ -59,7 +59,7 @@ def main():
     if global_args['config_merge']:
         config_kwargs.update(global_args['config_merge'])
 
-    tokenizer, config, _, _ = dataHelper.load_tokenizer_and_config(tokenizer_class_name=ChatGLMTokenizer,
+    tokenizer, config, _, _ = dataHelper.load_tokenizer_and_config(tokenizer_class_name=ChatGLM4Tokenizer,
                                                                    config_class_name=ChatGLMConfig,
                                                                    config_kwargs=config_kwargs)
 

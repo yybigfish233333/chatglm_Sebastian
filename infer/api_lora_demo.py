@@ -13,7 +13,7 @@ from deep_training.nlp.models.chatglm2.modeling_chatglm import setup_model_profi
 from transformers import HfArgumentParser
 
 from data_utils import config_args, NN_DataHelper,global_args
-from deep_training.zoo.model_zoo.chatglm3.llm_model import MyTransformer, ChatGLMTokenizer,PetlArguments
+from deep_training.zoo.model_zoo.glm4.llm_model import MyTransformer, ChatGLM4Tokenizer,PetlArguments
 
 DEVICE = "cuda"
 DEVICE_ID = "0"
@@ -69,9 +69,9 @@ if __name__ == '__main__':
     setup_model_profile()
 
     dataHelper = NN_DataHelper(model_args, None, data_args)
-    tokenizer: ChatGLMTokenizer
+    tokenizer: ChatGLM4Tokenizer
     tokenizer, _, _, _ = dataHelper.load_tokenizer_and_config(
-        tokenizer_class_name=ChatGLMTokenizer, config_class_name=ChatGLMConfig)
+        tokenizer_class_name=ChatGLM4Tokenizer, config_class_name=ChatGLMConfig)
 
     ckpt_dir = './best_ckpt/last'
     config = ChatGLMConfig.from_pretrained(ckpt_dir)

@@ -1,6 +1,11 @@
 # @Time    : 2023/1/22 16:22
 # @Author  : tk
 # @FileName: data_utils.py
+
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),'..')))
+
 import copy
 import glob
 import json
@@ -16,7 +21,7 @@ from fastdatasets.record import load_dataset as Loader, RECORD, WriterObject, gf
 from tqdm import tqdm
 from transformers import HfArgumentParser
 from data_processer import DataStrategy, TokenIdsMaker
-from deep_training.zoo.model_zoo.chatglm3.llm_model import ChatGLMTokenizer,PetlArguments,ChatGLMConfig
+from deep_training.zoo.model_zoo.glm4.llm_model import ChatGLM4Tokenizer,PetlArguments,ChatGLMConfig
 from config import *
 
 assert config_args['max_seq_length'] > 20
@@ -69,7 +74,7 @@ class NN_DataHelper(DataHelper):
         self.index += 1
 
 
-        tokenizer: ChatGLMTokenizer = self.tokenizer # noqa
+        tokenizer: ChatGLM4Tokenizer = self.tokenizer # noqa
         config: ChatGLMConfig = self.config           # noqa
         max_seq_length = self.max_seq_length_dict[mode]
 
@@ -94,31 +99,7 @@ class NN_DataHelper(DataHelper):
             print(ds[0])
         return ds
 
-    def _get_paragraph(self, lines):
-        D = [ ]
-        for line_id, line in enumerate(lines):
-            jd = json.loads(line)
-            if not jd:
-                continue
-            paragraph = jd[ 'paragraph' ]
-            if line_id < 10:
-                print(paragraph)
 
-
-            paragraph = [ (session.get("role",""),preprocess(session[ 'q' ]),
-                           preprocess('\n'.join(session[ 'a' ])) if isinstance(session[ 'a' ], list) else preprocess(
-                               session[ 'a' ]))
-                          for session in paragraph ]
-            sub = [ ]
-            # 自行做模板
-            for (role, q, a) in paragraph:
-                # 不是system prompt  answer 必须存在
-                if role != "system":
-                    assert len(a), ValueError('answer cannot empty')
-                sub.append((role,q, a))
-            D.append(copy.deepcopy(sub))
-            sub.clear()
-        return D
 
     def _get_messages(self, lines):
         D = []
@@ -130,7 +111,6 @@ class NN_DataHelper(DataHelper):
             if line_id < 10:
                 print(conversations)
 
-
             cid = 0
             sub = []
             while cid < len(conversations):
@@ -139,10 +119,10 @@ class NN_DataHelper(DataHelper):
                 role = m["from"]
                 q = preprocess(m["value"])
                 if role == "system":
-                    a = ""
-                    sub.append((role,q,a))
+                    assert len(sub) == 0
+                    sub.append((role,q, m.pop('tools', None)))
                     continue
-                assert role in ['user','observation','function']
+                assert role in ['user','observation']
                 m = conversations[cid]
                 cid += 1
                 assert m["from"] == "assistant"
@@ -158,13 +138,7 @@ class NN_DataHelper(DataHelper):
         for file in files:
             with open(file, mode='r', encoding='utf-8', newline='\n') as f:
                 lines = f.readlines()
-            is_new = False
-            if len(lines) > 0:
-                is_new = 'conversations' in json.loads(lines[0])
-            if is_new:
-                D.extend(self._get_messages(lines))
-            else:
-                D.extend(self._get_paragraph(lines))
+            D.extend(self._get_messages(lines))
         return D
 
     def collate_fn(self,batch):
@@ -249,7 +223,7 @@ if __name__ == '__main__':
         model_args, training_args, data_args, lora_args = parser.parse_dict(config_args,allow_extra_keys=True,)
 
     dataHelper = NN_DataHelper(model_args, training_args, data_args)
-    tokenizer, config, _,_ = dataHelper.load_tokenizer_and_config(tokenizer_class_name=ChatGLMTokenizer,
+    tokenizer, config, _,_ = dataHelper.load_tokenizer_and_config(tokenizer_class_name=ChatGLM4Tokenizer,
                                                                   config_class_name=ChatGLMConfig)
     
 

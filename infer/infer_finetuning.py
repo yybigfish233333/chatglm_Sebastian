@@ -8,7 +8,7 @@ import torch
 from deep_training.data_helper import ModelArguments
 from transformers import HfArgumentParser
 from data_utils import config_args, NN_DataHelper, get_deepspeed_config
-from deep_training.zoo.model_zoo.chatglm3.llm_model import MyTransformer,ChatGLMTokenizer,setup_model_profile, ChatGLMConfig,PetlArguments
+from deep_training.zoo.model_zoo.glm4.llm_model import MyTransformer,ChatGLM4Tokenizer,setup_model_profile, ChatGLMConfig,PetlArguments
 
 deep_config = get_deepspeed_config()
 
@@ -23,9 +23,9 @@ if __name__ == '__main__':
     setup_model_profile()
 
     dataHelper = NN_DataHelper(model_args,)
-    tokenizer: ChatGLMTokenizer
+    tokenizer: ChatGLM4Tokenizer
     tokenizer, _, _, _ = dataHelper.load_tokenizer_and_config(
-        tokenizer_class_name=ChatGLMTokenizer, config_class_name=ChatGLMConfig)
+        tokenizer_class_name=ChatGLM4Tokenizer, config_class_name=ChatGLMConfig)
 
     ###################### 注意 选最新权重
     #选择最新的权重 ， 根据时间排序 选最新的

@@ -8,7 +8,7 @@ import torch
 from deep_training.data_helper import ModelArguments
 from transformers import HfArgumentParser
 from data_utils import config_args, NN_DataHelper, global_args
-from deep_training.zoo.model_zoo.chatglm3.llm_model import MyTransformer, ChatGLMTokenizer, setup_model_profile, ChatGLMConfig, \
+from deep_training.zoo.model_zoo.glm4.llm_model import MyTransformer, ChatGLM4Tokenizer, setup_model_profile, ChatGLMConfig, \
     PetlArguments,PetlModel
 
 if __name__ == '__main__':
@@ -17,9 +17,9 @@ if __name__ == '__main__':
     (model_args, ) = parser.parse_dict(config_args, allow_extra_keys=True)
     setup_model_profile()
     dataHelper = NN_DataHelper(model_args)
-    tokenizer: ChatGLMTokenizer
+    tokenizer: ChatGLM4Tokenizer
     tokenizer, _, _, _ = dataHelper.load_tokenizer_and_config(
-        tokenizer_class_name=ChatGLMTokenizer, config_class_name=ChatGLMConfig)
+        tokenizer_class_name=ChatGLM4Tokenizer, config_class_name=ChatGLMConfig)
 
     ckpt_dir = './best_ckpt/last'
     config = ChatGLMConfig.from_pretrained(ckpt_dir)
