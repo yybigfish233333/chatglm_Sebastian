@@ -1,0 +1,64 @@
+includes:
+  - /content/chatglm_Sebastian/config/global.yaml
+  - /content/chatglm_Sebastian/config/petl.yaml
+
+global_args:
+  trainer_backend: hf
+  model_name: glm-4-9b-chat         # 与 global.yaml 里的映射键一致
+  enable_deepspeed: false
+  enable_lora: true
+  enable_ptv2: false
+  load_in_bit: 4                     # QLoRA（4bit）
+  precision: auto                    # A100 自动用 bf16
+  quantization_config:
+    load_in_4bit: true
+    bnb_4bit_quant_type: nf4
+    bnb_4bit_compute_dtype: auto
+    bnb_4bit_use_double_quant: true
+
+do_train: true
+do_eval: false
+do_test: false
+overwrite_cache: true
+overwrite_output_dir: true
+
+train_file:
+  - data/finetune_train_examples.json
+data_backend: parquet
+
+output_dir: /content/drive/MyDrive/sebastian_chat/output/sebastian_glm4_lora
+max_seq_length: 512
+
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 16
+learning_rate: 2.0e-4
+num_train_epochs: 2
+weight_decay: 0.01
+adam_epsilon: 1.0e-8
+max_grad_norm: 1.0
+warmup_steps: 0
+lr_scheduler_type: linear
+
+bf16: true
+fp16: false
+gradient_checkpointing: false
+report_to: ["tensorboard"]
+
+dataloader_drop_last: true
+dataloader_pin_memory: true
+dataloader_num_workers: 0
+
+lora:
+  with_lora: true
+  r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  bias: "none"
+  target_modules: []                 # 留空 → main.py 会按 model_type 自动补齐
+
+adalora:
+  with_lora: false
+ia3:
+  with_lora: false
+
+optim: paged_adamw_8bit                # ✔️ 从 adamw_torch 改为 bitsandbytes 的 8bit
