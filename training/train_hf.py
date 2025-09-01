@@ -180,6 +180,9 @@ def main():
         data_collator=default_data_collator,
     )
 
+    if not hasattr(trainer, "fsdp"):
+      trainer.fsdp = None
+
     # Training
     if training_args.do_train:
         checkpoint = None
